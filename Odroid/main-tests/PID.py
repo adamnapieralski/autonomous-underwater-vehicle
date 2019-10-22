@@ -3,15 +3,15 @@ import time
 
 class PID:
 
-    def __init__(self, P=0.1, I=0., D=0.):
+    def __init__(self, P=0., I=0., D=0., set_point = 0, sample_time = 0.01):
 
         self.Kp = P
         self.Ki = I
         self.Kd = D
 
-        self.set_point = 0
+        self.set_point = set_point
 
-        self.sample_time = 0.01
+        self.sample_time = sample_time
         self.current_time = time.time()
         self.last_time = self.current_time
 
@@ -63,7 +63,7 @@ class PID:
             return self.output
 
         else:
-            return None
+            return 0  #self.output_prev
 
     def setKp(self, Kp):
         self.Kp = Kp
@@ -73,6 +73,9 @@ class PID:
 
     def setKd(self, Kd):
         self.Kd = Kd
+
+    def setSampleTime(self, sample_time):
+        self.sample_time = sample_time
 
     def setWindup(self, windup):
         self.windup_guard = windup
@@ -88,7 +91,9 @@ class PID:
 
     def setSampleTime(self, sample_time):
         self.sample_time = sample_time
-		
+
     def getError(self):
         return self.error
-	
+
+    def setSetPoint(self, set_point):
+        self.set_point = set_point
