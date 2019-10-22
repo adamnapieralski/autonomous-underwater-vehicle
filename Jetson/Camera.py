@@ -69,7 +69,7 @@ class Camera:
             except Exception:
                 pass
 
-        capture1 = cv2.VideoCapture(1)
+        capture1 = cv2.VideoCapture(0)
         capture1.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         capture1.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
         capture1.set(cv2.CAP_PROP_FPS, 30);
@@ -84,76 +84,71 @@ class Camera:
 
         while True:
             stime = time.time()
+            ret, frame = capture1.read()
+            #frame = frame[8:712,0:1280]
+            if ret:
+                 frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                 frame_resized = cv2.resize(frame_rgb,
+                      (darknet.network_width(netMain),
+                       darknet.network_height(netMain)),
+                      interpolation=cv2.INTER_LINEAR)
+                 self.detections.clear()
+                 self.updateFrameDimensions(frame_resized)
 
-            if(self.cameraFlag==False):
-                ret, frame = capture1.read()
-                #frame = frame[8:712,0:1280]
-                if ret:
-                     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                     frame_resized = cv2.resize(frame_rgb,
-                          (darknet.network_width(netMain),
-                           darknet.network_height(netMain)),
-                          interpolation=cv2.INTER_LINEAR)
-                     self.detections.clear()
-                     self.updateFrameDimensions(frame_resized)
+                 darknet.copy_image_from_bytes(darknet_image, frame_resized.tobytes())
 
-                     darknet.copy_image_from_bytes(darknet_image, frame_resized.tobytes())
-                
-                     self.detections = darknet.detect_image(netMain, metaMain, darknet_image, thresh=0.25)
+                 self.detections = darknet.detect_image(netMain, metaMain, darknet_image, thresh=0.25)
 
-                     frame, xmin, ymin, xmax, ymax = self.cvDrawBoxes(self.detections, frame_resized)
-                     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                 frame, xmin, ymin, xmax, ymax = self.cvDrawBoxes(self.detections, frame_resized)
 
-                     self.saveObjectsCenters(self.detections)
-                     self.objectsFillLevel = self.getObjectsFillLevel(self.detections)
+                 self.saveObjectsCenters(self.detections)
+                 self.objectsFillLevel = self.getObjectsFillLevel(self.detections)
 
-                     self.saveObjectsCenterDeltas()
-                     self.objectsFillLevel = round(self.objectsFillLevel, 2)
-                     
-                
-		# self.saveObjectsZones(detections)
-                # print(self.getObjectsZones())
+                 self.saveObjectsCenterDeltas()
+                 self.objectsFillLevel = round(self.objectsFillLevel, 2)
 
-                 #    self.getMonoDistance(self.detections)
-                     self.cameraFlag=True
-                     cv2.imshow('frameMono', frame)
-            else:
-                ret, frame = capture2.read()
-                frame = frame[8:712,0:1280]
-                if ret:
-                     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                     frame_resized = cv2.resize(frame_rgb,
-                          (darknet.network_width(netMain),
-                           darknet.network_height(netMain)),
-                          interpolation=cv2.INTER_LINEAR)
+                 self.cameraFlag=True
 
-                     self.updateFrameDimensions(frame_resized)
+                 self.calculatePathAngle(frame_resized)
 
-                     darknet.copy_image_from_bytes(darknet_image, frame_resized.tobytes())
-                
-                     self.detections = darknet.detect_image(netMain, metaMain, darknet_image, thresh=0.25)
+                 print("Kat: ", self.getPathAngle())
 
-                     frame, xmin, ymin, xmax, ymax = self.cvDrawBoxes(self.detections, frame_resized)
-                     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-                     self.saveObjectsCenters(self.detections)
-                     self.objectsFillLevel = self.getObjectsFillLevel(self.detections)
-
-                     self.saveObjectsCenterDeltas()
-               
-                
-		# self.saveObjectsZones(detections)
-                # print(self.getObjectsZones())
-
-                     #self.getMonoDistance(self.detections)
-                     self.cameraFlag=False
-                     cv2.imshow('frameStereo', frame)
+                 frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                 cv2.imshow('frame1', frame)
+            # else:
+            #     ret, frame = capture2.read()
+            #     frame = frame[8:712,0:1280]
+            #     if ret:
+            #          frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            #          frame_resized = cv2.resize(frame_rgb,
+            #               (darknet.network_width(netMain),
+            #                darknet.network_height(netMain)),
+            #               interpolation=cv2.INTER_LINEAR)
+            #
+            #          self.updateFrameDimensions(frame_resized)
+            #
+            #          darknet.copy_image_from_bytes(darknet_image, frame_resized.tobytes())
+            #
+            #          self.detections = darknet.detect_image(netMain, metaMain, darknet_image, thresh=0.25)
+            #
+            #          frame, xmin, ymin, xmax, ymax = self.cvDrawBoxes(self.detections, frame_resized)
+            #          frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            #
+            #          self.saveObjectsCenters(self.detections)
+            #          self.objectsFillLevel = self.getObjectsFillLevel(self.detections)
+            #
+            #          self.saveObjectsCenterDeltas()
+            #
+            #          #self.getMonoDistance(self.detections)
+            #          self.cameraFlag=False
+            #          cv2.imshow('frameStereo', frame)
 
             print('FPS {:.1f}\n'.format(1 / (time.time() - stime)))
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
-        capture.release()
+        capture1.release()
+        capture2.release()
         cv2.destroyAllWindows()
 
     def updateFrameDimensions(self, frame):
@@ -253,39 +248,45 @@ class Camera:
             self.objCenterDeltas.append(objCenterDelta)
 
 
-    def getPathAngle(self,frame):
-        
-        grayImage = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        hsvImage = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    def calculatePathAngle(self, frame):
+        hsvImage = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
         #dobrać HSV do koloru ścieżki
-        lowerColorPath = np.array([55, 0, 0])
-        upperColorPath = np.array([90, 255, 255])
-        maskPath = cv2.inRange(hsvImage, lowerColorPath, upperColorPath)
-        res = cv2.bitwise_and(frame, frame, mask=maskPath)
-        gaussBlur = cv2.medianBlur(res,15)
-        grayImage = cv2.cvtColor(gaussBlur, cv2.COLOR_BGR2GRAY)
-        _, thresh = cv2.threshold(grayImage, 127, 255, 0)
-        kernel = np.ones((5,5), np.uint8)
+        lowerColorPath = np.array([45, 80, 80])
+        upperColorPath = np.array([60, 255, 255])
+        maskBin = cv2.inRange(hsvImage, lowerColorPath, upperColorPath)
+        maskBlur= cv2.GaussianBlur(maskBin, (5,5), 0)
 
-        imgErosion = cv2.erode(thresh, kernel, iterations=1)
-        imgDilation = cv2.dilate(imgErosion, kernel, iterations=5)
-        _, contours,_ = cv2.findContours(imgDilation, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        _, contours,_ = cv2.findContours(maskBlur, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
+        if len(contours) == 0:
+            self.pathAngle = 0
+            return
+
+        # find biggest rect by its diag
+        boxSizes = []
         for contour in contours:
-           rect = cv2.minAreaRect(contour)
-           angle = rect[2]
-           box = cv2.boxPoints(rect)
-           angle=int(rect[2])
-           if(rect[1][1]>rect[1][0]):
-              cv2.line(frame, (int(box[0][0]),int(box[0][1])), (int(box[1][0]),int(box[1][1])), (0,255,0), 2)
-              cv2.line(frame, (int(box[2][0]),int(box[2][1])), (int(box[3][0]),int(box[3][1])), (0,255,0), 2)
-              angle=90+abs(int(rect[2]))
-           if(rect[1][1]<rect[1][0]):   
-              cv2.line(frame, (int(box[0][0]),int(box[0][1])), (int(box[3][0]),int(box[3][1])), (0,255,0), 2)
-              cv2.line(frame, (int(box[1][0]),int(box[1][1])), (int(box[2][0]),int(box[2][1])), (0,255,0), 2)
-              angle=abs(int(rect[2]))
-        cv2.imshow('',frame)
-        return angle
+            rect = cv2.minAreaRect(contour)
+            boxSizes.append((rect[1][0]**2 + rect[1][1]**2)**0.5)
+        id = boxSizes.index(max(boxSizes))
+
+        rect = cv2.minAreaRect(contours[id])
+        boxSizes.append(rect)
+        angle = rect[2]
+        box = cv2.boxPoints(rect)
+        angle=int(rect[2])
+
+        if(rect[1][1]>rect[1][0]):
+          cv2.line(frame, (int(box[0][0]),int(box[0][1])), (int(box[1][0]),int(box[1][1])), (0,255,0), 2)
+          cv2.line(frame, (int(box[2][0]),int(box[2][1])), (int(box[3][0]),int(box[3][1])), (0,255,0), 2)
+          angle=90+abs(int(rect[2]))
+
+        if(rect[1][1]<rect[1][0]):
+          cv2.line(frame, (int(box[0][0]),int(box[0][1])), (int(box[3][0]),int(box[3][1])), (0,255,0), 2)
+          cv2.line(frame, (int(box[1][0]),int(box[1][1])), (int(box[2][0]),int(box[2][1])), (0,255,0), 2)
+          angle=abs(int(rect[2]))
+
+        cv2.imshow('', maskBlur)
+        self.pathAngle = angle
 
     def getMonoDistance(self,detections):
         T = np.zeros((3, 1), dtype=np.float64)
